@@ -1,26 +1,15 @@
-
-import random
-import fire
 import datetime as dt
-import numpy as np
-import pandas as pd
+import random
 from uuid import uuid4
 
-import keras
-import keras.backend as K
-from keras.optimizers import RMSprop, Adam, SGD
+import fire
+import numpy as np
+import pandas as pd
 from keras.losses import mean_squared_error, mean_absolute_error
-from models import normal_model, resnet_model
-
-def custom_loss(y_true, y_pred):
-    when_i_dont_care = K.zeros(y_true.shape)
-    when_i_do_care = K.log(y_true) - K.log(y_pred)
-    return K.sum(K.where(y_true != y_pred, when_i_dont_care, when_i_do_care))
-
-early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=10, verbose=0, mode='min')
-base_logger = keras.callbacks.BaseLogger()
-lr_scheduler = keras.callbacks.LearningRateScheduler(schedule=lambda x: 1/(1+x))
-plateau_reduces = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.001)
+from keras.optimizers import RMSprop, Adam, SGD
+from walholla.models import normal_model, resnet_model
+from walholla.callbacks import lr_scheduler, base_logger, early_stopping, plateau_reduces
+from walholla.losses import boosted_loss
 
 def experiment(epochs=2000,
                rows=2000,
@@ -43,7 +32,7 @@ def experiment(epochs=2000,
     }
 
     LOSS_FUNCTIONS = {
-        "custom_loss": custom_loss,
+        "boosted_loss": boosted_loss,
         "mse": mean_squared_error,
         "mae": mean_absolute_error
     }
