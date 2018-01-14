@@ -5,7 +5,7 @@
 ## Usage
 
 ```
-python wallholla.py
+python cl.py
 ```
 
 ## Why the name
