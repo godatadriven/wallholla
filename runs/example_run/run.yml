@@ -1,0 +1,25 @@
+model:
+  type: fully-connected
+  input_dim: 4 # Ideally, these follow automatically from the data
+  output_dim: 8 # Ideally, these follow automatically from the data
+  layers:
+    - type: dense
+      nodes: 8
+      activation: relu
+      dropout: 0.1
+    - type: dense
+      nodes: 8
+      activation: relu
+      dropout: 0.1
+    - type: dense
+      nodes: output
+      activation: linear
+      dropout: -1
+loss:
+  type: mse
+optimiser:
+  type: adam
+  lr: 0.01
+data: checkerboard
+
+

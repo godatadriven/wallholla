@@ -60,7 +60,7 @@ def custom_fc_model(input_dim,
             Be careful with 1 (integer: only one neuron) and 1.0 (float:
             as many neurons as inputs)
 
-        final_activation (str)
+        final_activation (Optional[str])
             Specify the activation of the final layer
 
         activations (collections.Sized[str])
@@ -95,6 +95,7 @@ def custom_fc_model(input_dim,
 
     if type(activations) == str:
         activations = len(layer_definitions)*[activations]
+
     if np.isscalar(dropouts):
         dropouts = len(activations)*[dropouts]
 
@@ -109,14 +110,16 @@ def custom_fc_model(input_dim,
         else:
             n_neurons = layer_def
 
-        if input_shape is not None:
+        if i == 0:
             model.add(Dense(units=n_neurons, activation=activation, input_shape=input_shape))
         else:
             model.add(Dense(units=n_neurons, activation=activation))
         if dropout > 0:
             model.add(Dropout(dropout))
 
-    model.add(Dense(units=output_dim, activation=final_activation))
+    if final_activation is not None:
+        model.add(Dense(units=output_dim, activation=final_activation))
+
     return model
 
 
