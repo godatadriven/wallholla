@@ -1,7 +1,7 @@
 model:
   type: fully-connected
-  input_dim: 4 # Ideally, these follow automatically from the data
-  output_dim: 8 # Ideally, these follow automatically from the data
+  input_dim: 2 # Ideally, these follow automatically from the data
+  output_dim: 1 # Ideally, these follow automatically from the data
   layers:
     - type: dense
       nodes: 8
@@ -15,11 +15,17 @@ model:
       nodes: output
       activation: linear
       dropout: -1
+fitpars:
+  epochs: 10
 loss:
   type: mse
 optimiser:
-  type: adam
-  lr: 0.01
-data: checkerboard
+  adam:
+    lr: 0.01
+data:
+  checkerboard:
+    n: 10000
+    k: 2
+
 
 
