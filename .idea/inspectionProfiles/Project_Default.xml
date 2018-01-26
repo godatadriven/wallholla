@@ -4,7 +4,7 @@
     <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ignoredPackages">
         <value>
-          <list size="16">
+          <list size="17">
             <item index="0" class="java.lang.String" itemvalue="google-cloud-bigquery" />
             <item index="1" class="java.lang.String" itemvalue="jupyter-core" />
             <item index="2" class="java.lang.String" itemvalue="tensorflow-tensorboard" />
@@ -21,6 +21,7 @@
             <item index="13" class="java.lang.String" itemvalue="matplotlib" />
             <item index="14" class="java.lang.String" itemvalue="ipywidgets" />
             <item index="15" class="java.lang.String" itemvalue="notebook" />
+            <item index="16" class="java.lang.String" itemvalue="sklearn" />
           </list>
         </value>
       </option>
