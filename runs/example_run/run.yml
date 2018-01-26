@@ -1,31 +1,35 @@
 model:
-  type: fully-connected
-  input_dim: 2 # Ideally, these follow automatically from the data
-  output_dim: 1 # Ideally, these follow automatically from the data
+  type: fully-connected # -> Generalize to feed forward and include convnet layers
+  input_dim: 10 # Ideally, these follow automatically from the data
+  output_dim: 10 # Ideally, these follow automatically from the data
   layers:
     - type: dense
-      nodes: 8
+      nodes: 32
       activation: relu
-      dropout: 0.1
+      dropout: -1
     - type: dense
-      nodes: 8
+      nodes: 32
       activation: relu
-      dropout: 0.1
+      dropout: -1
     - type: dense
       nodes: output
       activation: linear
       dropout: -1
 fitpars:
-  epochs: 10
+  epochs: 100
+  batch_size: 64
 loss:
   type: mse
 optimiser:
   adam:
-    lr: 0.01
+    lr: 0.02
 data:
-  checkerboard:
-    n: 10000
-    k: 2
+  normal_mirror:
+    n: 100000
+    k: 10
+    seed: 42
+
+
 
 
 
