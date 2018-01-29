@@ -37,17 +37,6 @@ def custom_fc_model(input_dim,
         layer_definitions (collections.Sized)
             For each layer the number of neurons for that layer
 
-            The number of neurons can either be specified directly by specifying an
-            integer number. When the number for a specific layer are given in float
-            numbers, then the number of neurons for that layer are given relative
-            to the input dimension. If the fraction does not yield a natural number,
-            the number of neurons for that layer are computed by rounding the
-            fractional number up to nearest integer. It is also possible to have
-            mixed float and integer types.
-
-            Be careful with 1 (integer: only one neuron) and 1.0 (float:
-            as many neurons as inputs)
-
         activations (collections.Sized[str] or str)
             Specify the activations for all layers or for each layer individually
 
@@ -78,17 +67,10 @@ def custom_fc_model(input_dim,
     if np.isscalar(dropouts):
         dropouts = len(activations)*[dropouts]
 
-    for i, layer_def, activation, dropout in zip(range(len(layer_definitions)),
+    for i, n_neurons, activation, dropout in zip(range(len(layer_definitions)),
                                                  layer_definitions,
                                                  activations,
                                                  dropouts):
-        if type(layer_def) == float:
-            n_neurons = int(np.ceil(input_dim * layer_def))
-            if n_neurons == 0:
-                raise ValueError("Number of neurons rounded down to zero in layer ")
-        else:
-            n_neurons = layer_def
-
         if i == 0:
             model.add(Dense(units=n_neurons, activation=activation, input_shape=input_shape))
         else:

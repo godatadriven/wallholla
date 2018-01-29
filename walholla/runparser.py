@@ -23,30 +23,32 @@ def load_config(yaml_file):
     return config
 
 
-def build_fully_connected(model_config):
-
-    input_dim = int(model_config['input_dim'])
-    output_dim = int(model_config['output_dim'])
+def build_fully_connected(model_config, input_dim, output_dim):
 
     df = pd.DataFrame.from_dict(model_config['layers'])
-    df.nodes = df.nodes.replace({'output': output_dim})
+    df.nodes = df.nodes.replace({np.nan: output_dim})
+
+    output_specified = df.nodes.iloc[-1]
+    if ~np.isnan(output_specified) and output_dim != output_specified:
+        raise ValueError(f"Number of nodes in the last layer ({output_specified}) "
+                         f"does not match the data ({output_dim}).")
 
     model = models.custom_fc_model(input_dim,
-                                   df.nodes,
+                                   df.nodes.astype(int),
                                    activations=df.activation,
                                    dropouts=df.dropout)
 
     return model
 
 
-def build_model(config):
+def build_model(config, input_dim, output_dim):
 
     model_builders = {
         'fully-connected': build_fully_connected
     }
 
     model_config = config['model']
-    return model_builders[model_config['type']](model_config)
+    return model_builders[model_config['type']](model_config, input_dim, output_dim)
 
 
 def build_optimiser(config):
@@ -84,9 +86,9 @@ def build_loss(config):
     return loss_choices[loss_config['type']]
 
 
-def build_and_compile_model(config):
+def build_and_compile_model(config, input_dim, output_dim):
 
-    model = build_model(config)
+    model = build_model(config, input_dim, output_dim)
 
     loss = config['loss']['type']
     optimiser = build_optimiser(config)
@@ -121,7 +123,7 @@ class Run(object):
         self.config = config
 
         self.x, self.y = build_dataset(config)
-        self.model = build_and_compile_model(config)
+        self.model = build_and_compile_model(config, self.get_input_dim(), self.get_output_dim())
 
         self.fitpars = {'validation_split': 0.25,
                         'verbose': 2}
@@ -169,3 +171,10 @@ class Run(object):
         # summary.update(self.config['optimiser'])
 
         return pd.DataFrame(summary)
+
+    def get_input_dim(self):
+        return self.x.shape[1]
+
+    def get_output_dim(self):
+        return self.y.shape[1]
+

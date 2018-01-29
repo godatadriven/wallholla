@@ -1,7 +1,5 @@
 model:
   type: fully-connected # -> Generalize to feed forward and include convnet layers
-  input_dim: 2 # Ideally, these follow automatically from the data
-  output_dim: 1 # Ideally, these follow automatically from the data
   layers:
     - type: dense
       nodes: 32
@@ -12,7 +10,7 @@ model:
       activation: relu
       dropout: -1
     - type: dense
-      nodes: output
+      nodes: 1 # This is optional
       activation: linear
       dropout: -1
 fitpars:

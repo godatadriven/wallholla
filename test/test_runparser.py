@@ -25,7 +25,7 @@ def test_load_config(config):
 
 
 def test_build_model(config):
-    model = runparser.build_model(config)
+    model = runparser.build_model(config, 2, 1)
     pass
 
 
