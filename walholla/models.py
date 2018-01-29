@@ -6,13 +6,6 @@ import numpy as np
 import collections
 
 
-def normal_model(input_dim, output_dim, depth, width, activation, final_activation, dropout):
-    """
-    This is a normal feed forward network.
-    """
-    return custom_fc_model(input_dim, output_dim, depth*[width], final_activation, activation, dropout)
-
-
 def resnet_model(input_dim, output_dim, depth, width, activation, final_activation, dropout):
     """
     This is a feed forward architecture that contains skip connections. 
@@ -32,9 +25,7 @@ def resnet_model(input_dim, output_dim, depth, width, activation, final_activati
 
 
 def custom_fc_model(input_dim,
-                    output_dim,
                     layer_definitions,
-                    final_activation='linear',
                     activations="relu",
                     dropouts=0.0):
     """Create a custom, fully-connected model
@@ -42,9 +33,6 @@ def custom_fc_model(input_dim,
     Args:
         input_dim (int)
             Shape/dimensionality of the input layer
-
-        output_dim (int)
-            Shape/dimensionality of the output layer
 
         layer_definitions (collections.Sized)
             For each layer the number of neurons for that layer
@@ -60,10 +48,7 @@ def custom_fc_model(input_dim,
             Be careful with 1 (integer: only one neuron) and 1.0 (float:
             as many neurons as inputs)
 
-        final_activation (Optional[str])
-            Specify the activation of the final layer
-
-        activations (collections.Sized[str])
+        activations (collections.Sized[str] or str)
             Specify the activations for all layers or for each layer individually
 
             If the argument is str the same activation function is applied to all
@@ -80,12 +65,6 @@ def custom_fc_model(input_dim,
         # followed by 8 neurons and 2 neurons and let each neuron in each layer
         # have a dropout probability of 0.1
         custom_model(16, 1, [1.0, 0.5, 2], dropout=0.1)
-
-        # Create a classification model that expands to twice the size of input,
-        # then narrows down to output size. Dropout is only applied on the
-        # expanding layers
-        custom_model(2, 1, [1024, 8.0, 8, 2], dropout=[0.1, 0, 0, 0],
-                     final_activation="sigmoid")
 
     Returns: Model
     """
@@ -116,9 +95,6 @@ def custom_fc_model(input_dim,
             model.add(Dense(units=n_neurons, activation=activation))
         if dropout > 0:
             model.add(Dropout(dropout))
-
-    if final_activation is not None:
-        model.add(Dense(units=output_dim, activation=final_activation))
 
     return model
 
