@@ -2,10 +2,26 @@
 
 > a playground for deep learning experiments
 
-## Usage
+## Until we have a proper setup.py
+
+Run the following command in the root folder before using `py.test` or the command line app.
 
 ```
-python cl.py
+export PYTHONPATH=`pwd`
+```
+
+## Run tests
+
+In the root folder run:
+
+```bash
+py.test test
+```
+
+## Usage command line app
+
+```
+python cl.py runs/example_run/run.yml
 ```
 
 ## Why the name

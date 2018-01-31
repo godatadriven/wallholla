@@ -1,0 +1,34 @@
+model:
+  type: fully-connected # -> Generalize to feed forward and include convnet layers
+  layers:
+    - type: dense
+      nodes: 32
+      activation: relu
+      dropout: -1
+    - type: dense
+      nodes: 32
+      activation: relu
+      dropout: -1
+    - type: dense
+      nodes: 1 # This is optional
+      activation: linear
+      dropout: -1
+fitpars:
+  epochs: 10
+  batch_size: 64
+loss:
+  type: mse
+optimiser:
+  adam:
+    lr: 0.02
+data:
+  checkerboard:
+    n: 10000
+    k: 2
+global:
+  seed: 42
+
+
+
+
+
