@@ -4,8 +4,23 @@
 
 ## Usage
 
+Here's an example: 
+
 ```
-python cl.py
+python command.py \
+  --dataset=catdog-small \
+  --data_size=10000 \
+  --generator=not-random \
+  --epochs=250 \
+  --learning_rate=0.001
+```
+
+## Test 
+
+We're experimenting with the `marbles` library for our tests. You can run a test via;
+
+```
+python -m marbles tests/utils-tests.py
 ```
 
 ## Why the name
