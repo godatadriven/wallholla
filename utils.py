@@ -103,15 +103,13 @@ def make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=Tr
 
 
 def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
-                            model="vgg16", n_img=100, img_size=(224, 224)):
+                            model="vgg16", n_img=100, img_size=(224, 224), pretrained_folder=PRETRAINED_PATH):
     filename = make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=False)
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filename
-
     logger.debug("about to make pretrained weights")
     datagen = get_image_generator(kind=generator)
     train_folder, valid_folder = get_folders(dataset=dataset)
-    # TODO make this faster because 1 at a time
-    # TODO that is really asking for overhead, right ?
+
     train_generator = datagen.flow_from_directory(
         train_folder,
         target_size=img_size,
@@ -151,8 +149,8 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
     pretrained_train = base_model.predict(x_train, verbose=1)
 
     logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
-    data_fp_x_train = os.path.join(PRETRAINED_PATH, x_train_fname)
-    data_fp_y_train = os.path.join(PRETRAINED_PATH, y_train_fname)
+    data_fp_x_train = os.path.join(pretrained_folder, x_train_fname)
+    data_fp_y_train = os.path.join(pretrained_folder, y_train_fname)
     np.save(data_fp_x_train, pretrained_train)
     logger.debug(f"data has been written over at {data_fp_x_train}")
     np.save(data_fp_y_train, y_train)
@@ -162,8 +160,8 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
     tick = dt.datetime.now()
     pretrained_valid = base_model.predict(x_valid, verbose=1)
     logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
-    data_fp_x_valid = os.path.join(PRETRAINED_PATH, x_valid_fname)
-    data_fp_y_valid = os.path.join(PRETRAINED_PATH, y_valid_fname)
+    data_fp_x_valid = os.path.join(pretrained_folder, x_valid_fname)
+    data_fp_y_valid = os.path.join(pretrained_folder, y_valid_fname)
     np.save(data_fp_x_valid, pretrained_valid)
     logger.debug(f"data has been written over at {data_fp_x_valid}")
     np.save(data_fp_y_valid, y_valid)
@@ -171,14 +169,16 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
 
 
 def get_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
-                           model="mobilenet", n_img=10, img_size=(224, 224)):
+                           model="mobilenet", n_img=10, img_size=(224, 224),
+                           image_folder=BASEPATH, pretrained_folder=PRETRAINED_PATH):
     filenames = make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=True)
     for name in filenames:
-        if not os.path.exists(os.path.join(PRETRAINED_PATH, name)):
-            logger.debug(f"{os.path.join(PRETRAINED_PATH, name)} does not exist! creating .npz files.")
-            make_pretrained_weights(dataset, generator, class_mode, model, n_img, img_size)
+        if not os.path.exists(os.path.join(pretrained_folder, name)):
+            logger.debug(f"{os.path.join(pretrained_folder, name)} does not exist! creating .npz files.")
+            make_pretrained_weights(dataset=dataset, generator=generator, class_mode=class_mode,
+                                    model=model, n_img=n_img, img_size=img_size, pretrained_folder=pretrained_folder)
 
-    x_train_fpath, y_train_fpath, x_valid_fpath, y_valid_fpath = [os.path.join(PRETRAINED_PATH, _) for _ in filenames]
+    x_train_fpath, y_train_fpath, x_valid_fpath, y_valid_fpath = [os.path.join(pretrained_folder, _) for _ in filenames]
     x_train = np.load(x_train_fpath)
     y_train = np.load(y_train_fpath)
     x_valid = np.load(x_valid_fpath)

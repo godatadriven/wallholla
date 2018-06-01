@@ -15,6 +15,13 @@ python command.py \
   --learning_rate=0.001
 ```
 
+If you want to run this on floydhub.
+
+```
+floyd
+```
+
+
 ## Test 
 
 We're experimenting with the `marbles` library for our tests. You can run a test via;
