@@ -1,5 +1,6 @@
 import sys
 import os
+import glob
 import logging
 from collections import Counter
 import datetime as dt
@@ -7,14 +8,16 @@ import datetime as dt
 import tqdm
 import fire
 import numpy as np
+from shutil import copyfile
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Dropout, Flatten, Dense, Input
 from keras.models import Model, Sequential
 from keras import applications
-from keras import backend as K
+from keras import backend as kb
 
 from settings import BASEPATH, PRETRAINED_PATH
+
 
 stdout_handler = logging.StreamHandler(sys.stdout)
 logging.basicConfig(
@@ -50,7 +53,7 @@ def get_pretrained_model(model, img_size):
         raise ValueError(f"model needs to be either {possible_names}")
     logger.debug(f"backend for model is {model}")
     width, height = img_size
-    if K.image_data_format() == 'channels_first':
+    if kb.image_data_format() == 'channels_first':
         input_shape = (3, width, height)
     else:
         input_shape = (width, height, 3)
@@ -102,14 +105,35 @@ def make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=Tr
     return names
 
 
-def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
-                            model="vgg16", n_img=100, img_size=(224, 224), pretrained_folder=PRETRAINED_PATH):
-    filename = make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=False)
+def make_pretrained_weights(dataset="catdog-small", generator="random", class_mode="binary",
+                            model="vgg16", n_train_img=100, img_size=(224, 224),
+                            pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
+    filename = make_pretrained_filenames(dataset, generator, model, n_train_img, img_size, npy=False)
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filename
     logger.debug("about to make pretrained weights")
     datagen = get_image_generator(kind=generator)
     train_folder, valid_folder = get_folders(dataset=dataset)
 
+    if n_orig_img:
+        logger.debug(f"number of original images is set. will take reduced set of {n_orig_img} imgs")
+        # point to tmp folder
+        tmp_folder = "/tmp/tmp_folder"
+        if not os.path.exists(tmp_folder):
+            os.mkdir(tmp_folder)
+        logger.debug(f"moving {n_orig_img} to {tmp_folder} temporarily")
+        train_class_dirs = glob.glob(f"{train_folder}/*/")
+        for imgdir in train_class_dirs:
+            class_img_paths = glob.glob(imgdir + '*')
+            logger.debug(f"found class dirs: {imgdir} with {len(class_img_paths)} imgs")
+            for path_from in class_img_paths:
+                path, filename = os.path.split(path_from)
+                path_to = os.path.join(tmp_folder, os.path.basename(path), filename)
+                print(path_from, path_to)
+                # copyfile(path_from, path_to)
+
+        logger.debug(f"images copied, now removing {tmp_folder} contents")
+        pass
+        return 0
     train_generator = datagen.flow_from_directory(
         train_folder,
         target_size=img_size,
@@ -120,8 +144,8 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
         target_size=img_size,
         batch_size=1,
         class_mode=class_mode)
-    x_shape = [n_img] + list(train_generator.image_shape)
-    y_shape = (n_img,)
+    x_shape = [n_train_img] + list(train_generator.image_shape)
+    y_shape = (n_train_img,)
     logger.debug("about to generate datasets for training-set of pretrained model")
     x_train = np.ones(shape=x_shape)
     y_train = np.ones(shape=y_shape)
@@ -132,7 +156,7 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
     logger.debug(f"train labels to have shape {y_train.shape}")
     logger.debug(f"validation data to have shape {x_valid.shape}")
     logger.debug(f"validation labels to have shape {y_valid.shape}")
-    for i in tqdm.tqdm(range(n_img)):
+    for i in tqdm.tqdm(range(n_train_img)):
         img_data_train, label_data_train = next(train_generator)
         img_data_valid, label_data_valid = next(valid_generator)
         x_train[i, :] = img_data_train.squeeze()
@@ -170,13 +194,14 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
 
 def get_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
                            model="mobilenet", n_img=10, img_size=(224, 224),
-                           image_folder=BASEPATH, pretrained_folder=PRETRAINED_PATH):
+                           pretrained_folder=PRETRAINED_PATH):
     filenames = make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=True)
     for name in filenames:
         if not os.path.exists(os.path.join(pretrained_folder, name)):
             logger.debug(f"{os.path.join(pretrained_folder, name)} does not exist! creating .npz files.")
             make_pretrained_weights(dataset=dataset, generator=generator, class_mode=class_mode,
-                                    model=model, n_img=n_img, img_size=img_size, pretrained_folder=pretrained_folder)
+                                    model=model, n_train_img=n_img, img_size=img_size,
+                                    pretrained_folder=pretrained_folder)
 
     x_train_fpath, y_train_fpath, x_valid_fpath, y_valid_fpath = [os.path.join(pretrained_folder, _) for _ in filenames]
     x_train = np.load(x_train_fpath)
@@ -203,5 +228,6 @@ def final_layers_model(input_shape, hidden_layer=10, dropout=0.5):
     model = Model(img_input, x)
     return model
 
+
 if __name__ == "__main__":
-    fire.Fire(get_pretrained_weights)
+    fire.Fire(make_pretrained_weights)
