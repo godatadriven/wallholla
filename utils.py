@@ -105,6 +105,25 @@ def make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=Tr
     return names
 
 
+def copy_files_tmp(n_orig_img, train_folder):
+    tmp_folder = "/tmp/tmp_folder"
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    logger.debug(f"moving {n_orig_img} to {tmp_folder} temporarily")
+    train_class_dirs = glob.glob(f"{train_folder}/*/")
+    for imgdir in train_class_dirs:
+        class_img_paths = glob.glob(imgdir + '*')[:n_orig_img//2]
+        logger.debug(f"found class dirs: {imgdir} with {len(class_img_paths)} imgs")
+        for path_from in class_img_paths:
+            path, filename = os.path.split(path_from)
+            path_to = os.path.join(tmp_folder, os.path.basename(path), filename)
+            dir_to = os.path.join(tmp_folder, os.path.basename(path))
+            if not os.path.exists(dir_to):
+                os.mkdir(dir_to)
+            copyfile(path_from, path_to)
+        logger.debug(f"{dir_to} now contains {len(glob.glob(dir_to + '/*'))} files")
+    return tmp_folder
+
 def make_pretrained_weights(dataset="catdog-small", generator="random", class_mode="binary",
                             model="vgg16", n_train_img=100, img_size=(224, 224),
                             pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
@@ -116,24 +135,8 @@ def make_pretrained_weights(dataset="catdog-small", generator="random", class_mo
 
     if n_orig_img:
         logger.debug(f"number of original images is set. will take reduced set of {n_orig_img} imgs")
-        # point to tmp folder
-        tmp_folder = "/tmp/tmp_folder"
-        if not os.path.exists(tmp_folder):
-            os.mkdir(tmp_folder)
-        logger.debug(f"moving {n_orig_img} to {tmp_folder} temporarily")
-        train_class_dirs = glob.glob(f"{train_folder}/*/")
-        for imgdir in train_class_dirs:
-            class_img_paths = glob.glob(imgdir + '*')
-            logger.debug(f"found class dirs: {imgdir} with {len(class_img_paths)} imgs")
-            for path_from in class_img_paths:
-                path, filename = os.path.split(path_from)
-                path_to = os.path.join(tmp_folder, os.path.basename(path), filename)
-                print(path_from, path_to)
-                # copyfile(path_from, path_to)
+        train_folder = copy_files_tmp(n_orig_img=n_orig_img, train_folder=train_folder)
 
-        logger.debug(f"images copied, now removing {tmp_folder} contents")
-        pass
-        return 0
     train_generator = datagen.flow_from_directory(
         train_folder,
         target_size=img_size,
