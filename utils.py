@@ -8,7 +8,7 @@ import datetime as dt
 import tqdm
 import fire
 import numpy as np
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Dropout, Flatten, Dense, Input
@@ -16,7 +16,7 @@ from keras.models import Model, Sequential
 from keras import applications
 from keras import backend as kb
 
-from settings import BASEPATH, PRETRAINED_PATH
+from settings import BASEPATH, PRETRAINED_PATH, TMP_FOLDER
 
 
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -94,27 +94,29 @@ def get_folders(dataset="catdog"):
     return train_data_dir, validation_data_dir
 
 
-def make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=True):
+def make_pretrained_filenames(dataset, generator, model, n_img, img_size, n_orig_img, npy=True):
     base_name = f"{dataset}-{model}-{generator}-{n_img}-{'x'.join([str(i) for i in img_size])}"
     names = []
     for settype in ['train', 'valid']:
         for xy in ['data', 'label']:
             names.append(f"{base_name}-{settype}-{xy}")
+    if n_orig_img:
+        return [_ + f"-{n_orig_img}" for _ in names]
     if npy:
         return [_ + ".npy" for _ in names]
     return names
 
 
 def copy_files_tmp(n_orig_img, train_folder):
-    tmp_folder = "/tmp/tmp_folder"
+    tmp_folder = TMP_FOLDER
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
-    logger.debug(f"moving {n_orig_img} to {tmp_folder} temporarily")
+    logger.debug(f"copying {n_orig_img} imgs to {tmp_folder}")
     train_class_dirs = glob.glob(f"{train_folder}/*/")
     for imgdir in train_class_dirs:
-        class_img_paths = glob.glob(imgdir + '*')[:n_orig_img//2]
+        class_img_paths = glob.glob(imgdir + '*')
         logger.debug(f"found class dirs: {imgdir} with {len(class_img_paths)} imgs")
-        for path_from in class_img_paths:
+        for path_from in class_img_paths[:n_orig_img//2]:
             path, filename = os.path.split(path_from)
             path_to = os.path.join(tmp_folder, os.path.basename(path), filename)
             dir_to = os.path.join(tmp_folder, os.path.basename(path))
@@ -124,12 +126,17 @@ def copy_files_tmp(n_orig_img, train_folder):
         logger.debug(f"{dir_to} now contains {len(glob.glob(dir_to + '/*'))} files")
     return tmp_folder
 
-def make_pretrained_weights(dataset="catdog-small", generator="random", class_mode="binary",
+def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
                             model="vgg16", n_train_img=100, img_size=(224, 224),
                             pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
-    filename = make_pretrained_filenames(dataset, generator, model, n_train_img, img_size, npy=False)
+    filename = make_pretrained_filenames(dataset, generator, model, n_train_img, img_size, n_orig_img=n_orig_img, npy=False)
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filename
+    logger.debug(f"filename x_train_fname = {x_train_fname}")
+    logger.debug(f"filename y_train_fname = {y_train_fname}")
+    logger.debug(f"filename x_valid_fname = {x_valid_fname}")
+    logger.debug(f"filename y_valid_fname = {y_valid_fname}")
     logger.debug("about to make pretrained weights")
+
     datagen = get_image_generator(kind=generator)
     train_folder, valid_folder = get_folders(dataset=dataset)
 
@@ -159,6 +166,7 @@ def make_pretrained_weights(dataset="catdog-small", generator="random", class_mo
     logger.debug(f"train labels to have shape {y_train.shape}")
     logger.debug(f"validation data to have shape {x_valid.shape}")
     logger.debug(f"validation labels to have shape {y_valid.shape}")
+    logger.debug(f"about to generate pretrained dataset")
     for i in tqdm.tqdm(range(n_train_img)):
         img_data_train, label_data_train = next(train_generator)
         img_data_valid, label_data_valid = next(valid_generator)
@@ -193,6 +201,9 @@ def make_pretrained_weights(dataset="catdog-small", generator="random", class_mo
     logger.debug(f"data has been written over at {data_fp_x_valid}")
     np.save(data_fp_y_valid, y_valid)
     logger.debug(f"data has been written over at {data_fp_y_valid}")
+    if n_orig_img:
+        rmtree(TMP_FOLDER)
+        logger.debug("cleaned up tmp folder after writing pretrained features")
 
 
 def get_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
