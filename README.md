@@ -24,6 +24,31 @@ floyd
 ```
 
 
+## File Structure
+
+```
+pretrained
+ +- catdog
+     +- vgg16
+         +- validation
+         +- train-200-1000-random
+         +- train-200-1000-very-random
+     +- mobilenet
+         +- validation
+         +- train-200-1000-random
+         +- train-200-1000-very-random
+ +- mnist
+     +- vgg16
+         +- validation
+         +- train-200-1000-random
+         +- train-200-1000-very-random
+     +- mobilenet
+         +- validation
+         +- train-200-1000-random
+         +- train-200-1000-very-random
+ +- ...
+```
+
 ## Test 
 
 We're experimenting with the `marbles` library for our tests. You can run a test via;

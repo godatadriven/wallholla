@@ -28,14 +28,15 @@ logging.basicConfig(
 logger = logging.getLogger('keras')
 
 
+def ensure_exists(fullpath):
+    dirpath, filename = os.path.split(fullpath)
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
+    return fullpath
+
+
 def make_optimiser(name="adam", learning_rate=0.0001, **kwargs):
-    """
-    Helper to create an optimiser from the command line.
-    :param name: name of optimisers
-    :param learning_rate: learning rate of optimiser
-    :param kwargs: kwargs that can be passed along to keras optmiser
-    :return:
-    """
+    """Helper to create an optimiser from a string."""
     if name not in ["adam", "rsmprop", "sgd"]:
         raise ValueError("name needs to be either adam, rsmprop or sgd")
     optimizers = {
@@ -48,6 +49,7 @@ def make_optimiser(name="adam", learning_rate=0.0001, **kwargs):
 
 
 def get_pretrained_model(model, img_size):
+    """Helper to retreive appropriate pretrained model"""
     possible_names = ["vgg16", "vgg19", "mobilenet", "xception"]
     if model not in possible_names:
         raise ValueError(f"model needs to be either {possible_names}")
@@ -70,7 +72,7 @@ def get_pretrained_model(model, img_size):
 def get_image_generator(kind="random"):
     if kind not in ["random", "very-random", "not-random"]:
         raise ValueError("kind needs to be in `random`, `very-random`, `not-random`")
-    logger.debug(f"making image generator kind={kind}")
+    logger.debug(f"making image generator {kind}")
     if kind == "not-random":
         return ImageDataGenerator(rescale=1. / 255)
     if kind == "random":
@@ -94,19 +96,16 @@ def get_folders(dataset="catdog"):
     return train_data_dir, validation_data_dir
 
 
-def make_pretrained_filenames(dataset, generator, model, n_img, img_size, n_orig_img, npy=True):
-    names = []
-    for settype in ['train', 'valid']:
-        if settype == 'train':
-            base_name = f"{dataset}-{model}-{generator}-{n_img}-{'x'.join([str(i) for i in img_size])}"
-        if settype == 'valid':
-            base_name = f"{dataset}-{model}-{'x'.join([str(i) for i in img_size])}"
-        for xy in ['data', 'label']:
-            names.append(f"{base_name}-{settype}-{xy}")
-    if n_orig_img:
-        return [_ + f"-{n_orig_img}" for _ in names]
+def make_pretrained_filenames(dataset, model, generator, n_img, img_size, n_orig_img, npy=True):
+    size_str = "x".join([str(_) for _ in img_size])
+    names = [
+        f"{dataset}/{model}/{generator}/{size_str}-{n_orig_img}-{n_img}-train-data",
+        f"{dataset}/{model}/{generator}/{size_str}-{n_orig_img}-{n_img}-train-label",
+        f"{dataset}/{model}/{size_str}-valid-data",
+        f"{dataset}/{model}/{size_str}-valid-label",
+    ]
     if npy:
-        return [_ + ".npy" for _ in names]
+        return [_ + '.npy' for _ in names]
     return names
 
 
@@ -129,7 +128,9 @@ def copy_files_tmp(n_orig_img, train_folder):
         logger.debug(f"{dir_to} now contains {len(glob.glob(dir_to + '/*'))} files")
     return tmp_folder
 
-def make_validation_pretrained(dataset, class_mode, model, pretrained_folder):
+
+def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, filenames, img_size):
+    x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
     logger.debug("will make pretrained validation set")
     datagen = get_image_generator(kind="not-random")
     train_folder, valid_folder = get_folders(dataset=dataset)
@@ -140,37 +141,40 @@ def make_validation_pretrained(dataset, class_mode, model, pretrained_folder):
         batch_size=1,
         class_mode=class_mode)
     n_imgs = len(glob.glob(valid_folder + '/*/*'))
-    x_shape = [n_imgs ] + list(n_imgs .image_shape)
+    x_shape = [n_imgs ] + list(valid_generator.image_shape)
     y_shape = (n_imgs ,)
     x_valid = np.ones(shape=x_shape)
     y_valid = np.ones(shape=y_shape)
     logger.debug(f"validation data to have shape {x_valid.shape}")
     logger.debug(f"validation labels to have shape {y_valid.shape}")
-    for i in tqdm.tqdm(range(glob.glob(valid_folder))):
+    for i in tqdm.tqdm(range(len(glob.glob(valid_folder + '/*/*')))):
         img_data_valid, label_data_valid = next(valid_generator)
         x_valid[i, :] = img_data_valid.squeeze()
         y_valid[i] = label_data_valid.squeeze()
     logger.debug(f"valid labels have following counts: {Counter(np.sort(y_valid))}")
 
-    pass
+    base_model = get_pretrained_model(model=model, img_size=img_size)
+    logger.debug(f"about to apply {model} to validation data")
+    tick = dt.datetime.now()
+    pretrained_valid = base_model.predict(x_valid, verbose=1)
+    logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
+    data_fp_x_valid = ensure_exists(os.path.join(pretrained_folder, x_valid_fname))
+    data_fp_y_valid = ensure_exists(os.path.join(pretrained_folder, y_valid_fname))
+    np.save(data_fp_x_valid, pretrained_valid)
+    logger.debug(f"data has been written over at {data_fp_x_valid}")
+    np.save(data_fp_y_valid, y_valid)
+    logger.debug(f"data has been written over at {data_fp_y_valid}")
 
-def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
-                            model="vgg16", n_train_img=100, img_size=(224, 224),
-                            pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
-    filename = make_pretrained_filenames(dataset, generator, model, n_train_img, img_size, n_orig_img=n_orig_img, npy=False)
-    x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filename
-    logger.debug(f"filename x_train_fname = {x_train_fname}")
-    logger.debug(f"filename y_train_fname = {y_train_fname}")
-    logger.debug(f"filename x_valid_fname = {x_valid_fname}")
-    logger.debug(f"filename y_valid_fname = {y_valid_fname}")
-    logger.debug("about to make pretrained weights")
 
-    datagen = get_image_generator(kind=generator)
+def make_training_pretrained(datagen, dataset, class_mode, model, pretrained_folder, filenames, n_orig_img, n_train_img, img_size):
+    x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
     train_folder, valid_folder = get_folders(dataset=dataset)
+    if not n_orig_img:
+        n_orig_img = len(glob.glob(train_folder+'*/*'))
+        logger.debug(f"`n_orig_img` not set, will take all {n_orig_img} imgs in train folder")
 
-    if n_orig_img:
-        logger.debug(f"number of original images is set. will take reduced set of {n_orig_img} imgs")
-        train_folder = copy_files_tmp(n_orig_img=n_orig_img, train_folder=train_folder)
+    logger.debug(f"will take set of {n_orig_img} imgs for training")
+    train_folder = copy_files_tmp(n_orig_img=n_orig_img, train_folder=train_folder)
 
     train_generator = datagen.flow_from_directory(
         train_folder,
@@ -198,23 +202,45 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
     pretrained_train = base_model.predict(x_train, verbose=1)
 
     logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
-    data_fp_x_train = os.path.join(pretrained_folder, x_train_fname)
-    data_fp_y_train = os.path.join(pretrained_folder, y_train_fname)
+    data_fp_x_train = ensure_exists(os.path.join(pretrained_folder, x_train_fname))
+    data_fp_y_train = ensure_exists(os.path.join(pretrained_folder, y_train_fname))
     np.save(data_fp_x_train, pretrained_train)
     logger.debug(f"data has been written over at {data_fp_x_train}")
     np.save(data_fp_y_train, y_train)
     logger.debug(f"data has been written over at {data_fp_y_train}")
 
-    logger.debug(f"about to apply {model} to validation data")
-    tick = dt.datetime.now()
-    pretrained_valid = base_model.predict(x_valid, verbose=1)
-    logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
-    data_fp_x_valid = os.path.join(pretrained_folder, x_valid_fname)
-    data_fp_y_valid = os.path.join(pretrained_folder, y_valid_fname)
-    np.save(data_fp_x_valid, pretrained_valid)
-    logger.debug(f"data has been written over at {data_fp_x_valid}")
-    np.save(data_fp_y_valid, y_valid)
-    logger.debug(f"data has been written over at {data_fp_y_valid}")
+def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
+                            model="vgg16", n_train_img=100, img_size=(224, 224),
+                            pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
+    filenames = make_pretrained_filenames(dataset, generator, model, n_train_img, img_size, n_orig_img=n_orig_img, npy=False)
+    x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
+    logger.debug(f"filename x_train_fname = {x_train_fname}")
+    logger.debug(f"filename y_train_fname = {y_train_fname}")
+    logger.debug(f"filename x_valid_fname = {x_valid_fname}")
+    logger.debug(f"filename y_valid_fname = {y_valid_fname}")
+    logger.debug("about to make pretrained weights")
+
+    datagen = get_image_generator(kind=generator)
+    make_training_pretrained(datagen=datagen,
+                             dataset=dataset,
+                             class_mode=class_mode,
+                             model=model,
+                             pretrained_folder=pretrained_folder,
+                             filenames=filenames,
+                             n_train_img=n_train_img,
+                             img_size=img_size,
+                             n_orig_img=n_orig_img)
+
+    make_validation_pretrained(dataset=dataset,
+                               class_mode=class_mode,
+                               model=model,
+                               pretrained_folder=pretrained_folder,
+                               filenames=filenames,
+                               img_size=img_size)
+
+
+
+
     if n_orig_img:
         rmtree(TMP_FOLDER)
         logger.debug("cleaned up tmp folder after writing pretrained features")
