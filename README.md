@@ -1,5 +1,7 @@
 # Wallholla
 
+![](overview.png)
+
 > a playground for deep learning experiments
 
 ## Usage

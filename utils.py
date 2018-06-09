@@ -95,9 +95,12 @@ def get_folders(dataset="catdog"):
 
 
 def make_pretrained_filenames(dataset, generator, model, n_img, img_size, n_orig_img, npy=True):
-    base_name = f"{dataset}-{model}-{generator}-{n_img}-{'x'.join([str(i) for i in img_size])}"
     names = []
     for settype in ['train', 'valid']:
+        if settype == 'train':
+            base_name = f"{dataset}-{model}-{generator}-{n_img}-{'x'.join([str(i) for i in img_size])}"
+        if settype == 'valid':
+            base_name = f"{dataset}-{model}-{'x'.join([str(i) for i in img_size])}"
         for xy in ['data', 'label']:
             names.append(f"{base_name}-{settype}-{xy}")
     if n_orig_img:
@@ -126,6 +129,31 @@ def copy_files_tmp(n_orig_img, train_folder):
         logger.debug(f"{dir_to} now contains {len(glob.glob(dir_to + '/*'))} files")
     return tmp_folder
 
+def make_validation_pretrained(dataset, class_mode, model, pretrained_folder):
+    logger.debug("will make pretrained validation set")
+    datagen = get_image_generator(kind="not-random")
+    train_folder, valid_folder = get_folders(dataset=dataset)
+
+    valid_generator = datagen.flow_from_directory(
+        valid_folder,
+        target_size=img_size,
+        batch_size=1,
+        class_mode=class_mode)
+    n_imgs = len(glob.glob(valid_folder + '/*/*'))
+    x_shape = [n_imgs ] + list(n_imgs .image_shape)
+    y_shape = (n_imgs ,)
+    x_valid = np.ones(shape=x_shape)
+    y_valid = np.ones(shape=y_shape)
+    logger.debug(f"validation data to have shape {x_valid.shape}")
+    logger.debug(f"validation labels to have shape {y_valid.shape}")
+    for i in tqdm.tqdm(range(glob.glob(valid_folder))):
+        img_data_valid, label_data_valid = next(valid_generator)
+        x_valid[i, :] = img_data_valid.squeeze()
+        y_valid[i] = label_data_valid.squeeze()
+    logger.debug(f"valid labels have following counts: {Counter(np.sort(y_valid))}")
+
+    pass
+
 def make_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
                             model="vgg16", n_train_img=100, img_size=(224, 224),
                             pretrained_folder=PRETRAINED_PATH, n_orig_img=None):
@@ -149,34 +177,20 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
         target_size=img_size,
         batch_size=1,
         class_mode=class_mode)
-    valid_generator = datagen.flow_from_directory(
-        valid_folder,
-        target_size=img_size,
-        batch_size=1,
-        class_mode=class_mode)
     x_shape = [n_train_img] + list(train_generator.image_shape)
     y_shape = (n_train_img,)
     logger.debug("about to generate datasets for training-set of pretrained model")
     x_train = np.ones(shape=x_shape)
     y_train = np.ones(shape=y_shape)
-    x_valid = np.ones(shape=x_shape)
-    y_valid = np.ones(shape=y_shape)
 
     logger.debug(f"train data to have shape {x_train.shape}")
     logger.debug(f"train labels to have shape {y_train.shape}")
-    logger.debug(f"validation data to have shape {x_valid.shape}")
-    logger.debug(f"validation labels to have shape {y_valid.shape}")
-    logger.debug(f"about to generate pretrained dataset")
+    logger.debug(f"about to generate pretrained dataset for training")
     for i in tqdm.tqdm(range(n_train_img)):
         img_data_train, label_data_train = next(train_generator)
-        img_data_valid, label_data_valid = next(valid_generator)
         x_train[i, :] = img_data_train.squeeze()
         y_train[i] = label_data_train.squeeze()
-        x_valid[i, :] = img_data_valid.squeeze()
-        y_valid[i] = label_data_valid.squeeze()
-    logger.debug("train/validation input arrays has been prepared")
     logger.debug(f"train labels have following counts: {Counter(np.sort(y_train))}")
-    logger.debug(f"valid labels have following counts: {Counter(np.sort(y_valid))}")
 
     base_model = get_pretrained_model(model=model, img_size=img_size)
     logger.debug(f"about to apply {model} to train data")
