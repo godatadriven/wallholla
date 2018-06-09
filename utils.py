@@ -131,6 +131,14 @@ def copy_files_tmp(n_orig_img, train_folder):
 
 def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, filenames, img_size):
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
+    data_fp_x_valid = ensure_exists(os.path.join(pretrained_folder, x_valid_fname))
+    data_fp_y_valid = ensure_exists(os.path.join(pretrained_folder, y_valid_fname))
+    if os.path.exists(data_fp_x_valid + '.npy'):
+        logger.debug(f"found {data_fp_x_valid + '.npy'}")
+        if os.path.exists(data_fp_y_valid + '.npy'):
+            logger.debug(f"found {data_fp_y_valid + '.npy'}")
+            logger.debug("validation data seems to exist, won't create new ones.")
+            return 0
     logger.debug("will make pretrained validation set")
     datagen = get_image_generator(kind="not-random")
     train_folder, valid_folder = get_folders(dataset=dataset)
@@ -158,8 +166,7 @@ def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, fi
     tick = dt.datetime.now()
     pretrained_valid = base_model.predict(x_valid, verbose=1)
     logger.debug(f"predicting took {(dt.datetime.now() - tick).seconds}s or {(dt.datetime.now() - tick)} time")
-    data_fp_x_valid = ensure_exists(os.path.join(pretrained_folder, x_valid_fname))
-    data_fp_y_valid = ensure_exists(os.path.join(pretrained_folder, y_valid_fname))
+
     np.save(data_fp_x_valid, pretrained_valid)
     logger.debug(f"data has been written over at {data_fp_x_valid}")
     np.save(data_fp_y_valid, y_valid)
@@ -284,4 +291,5 @@ def final_layers_model(input_shape, hidden_layer=10, dropout=0.5):
 
 
 if __name__ == "__main__":
+    # TODO: check if validation set allready exists before creating!
     fire.Fire(make_pretrained_weights)
