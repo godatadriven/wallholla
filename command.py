@@ -6,6 +6,7 @@ floyd run --cpu2 --env tensorflow-1.8 --data cantdutchthis/datasets/dataz/1:/dat
 
 import fire
 import keras
+import datetime as dt
 import itertools as it
 from uuid import uuid4 as uuid
 import tensorflow as tf
@@ -27,38 +28,37 @@ class Metrics(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         self.epoch += 1
-        data = {**logs, **self.settings, **{"epoch": self.epoch}}
+        data = {**logs, **self.settings, **{"epoch": self.epoch, "timestamp": str(dt.datetime.now())}}
         data.pop('output_folder')
         data.pop('pretrained_folder')
         data.pop('image_folder')
         self.losses.append(data)
 
 
-def main(dataset='catdog-small', model="mobilenet", generator="random", n_img=100,
-         epochs=20, batch_size=16, hidden_layer_size=3, optimiser="adam",
-         learning_rate=0.0001, loss='binary_crossentropy', early_stopping=None,
-         image_folder=None, pretrained_folder=None, output_folder=None):
+def main(dataset='catdog', model="mobilenet", generator="random", n_train_img=100,
+         n_orig_img=100, epochs=20, batch_size=16, hidden_layer_size=3, optimiser="adam",
+         learning_rate=0.0001, loss='binary_crossentropy', early_stopping=True,
+         image_folder=None, pretrained_folder=None, output_folder=None, use_tqdm=True):
     if not image_folder:
         image_folder = BASEPATH
     if not pretrained_folder:
         pretrained_folder = PRETRAINED_PATH
-    if not early_stopping:
-        early_stopping = epochs
     inputs = locals()
     inputs['runid'] = str(uuid())[:8]
 
     logger.debug(f"keras {keras.__version__} running with tensorflow version: {tf.__version__}")
-    x_train, y_train, x_valid, y_valid = get_pretrained_weights(dataset=dataset,
-                                                                model=model,
-                                                                generator=generator,
-                                                                n_img=n_img,
-                                                                image_folder=image_folder,
-                                                                pretrained_folder=pretrained_folder)
+    weights = get_pretrained_weights(dataset=dataset, model=model, generator=generator,
+                                     n_img=n_train_img, n_orig_img=n_orig_img, pretrained_folder=pretrained_folder)
+    x_train, y_train, x_valid, y_valid = weights
 
     mod = final_layers_model(input_shape=x_train.shape, hidden_layer=hidden_layer_size)
     mod.summary()
-    stopping = keras.callbacks.EarlyStopping(monitor='val_loss', mode='auto', patience=5)
+
     metrics = Metrics(inputs)
+    callbacks = [metrics]
+    stopping = keras.callbacks.EarlyStopping(monitor='val_loss', mode='auto', patience=5)
+    if early_stopping:
+        callbacks.append(stopping)
 
     opt = make_optimiser(name=optimiser, learning_rate=learning_rate)
     mod.compile(optimizer=opt, loss=loss, metrics=["accuracy"])
@@ -66,23 +66,30 @@ def main(dataset='catdog-small', model="mobilenet", generator="random", n_img=10
     mod.fit(x_train, y_train,
             epochs=epochs, batch_size=batch_size,
             verbose=1, validation_data=(x_valid, y_valid),
-            callbacks=[stopping, metrics])
+            callbacks=callbacks)
     logger.debug(f"training has completed!")
-    print(pd.DataFrame([m for m in metrics.losses if type(m) == type(dict())]))
+    df = pd.DataFrame([m for m in metrics.losses if type(m) == type(dict())])
+    print(df)
+    df.to_csv(f"/output/{inputs['runid']}.csv", index=False)
 
 
-def make_pretraines(dataset="catdog", generator="random", model="vgg16", pretrained_folder="/output"):
-    n_img_orig = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000, 2500, 5000]
-    n_img_pretrained = [1000, 5000, 10000]
-    for orig, n_gen in it.product(n_img_orig, n_img_pretrained):
-        print(orig, n_gen)
-        make_pretrained_weights(dataset=dataset, generator=generator,
-                                class_mode="binary", model=model, n_train_img=n_gen,
-                                img_size=(224, 224), pretrained_folder=pretrained_folder)
+def run_grid(dataset="catdog", generator="random", model="mobilenet",
+             pretrained_folder="/tmp", output_folder="/output", epochs=100, use_tqdm=True):
+    models = [model]
+    n_img_orig = [10, 100, 500, 1000, 2000]
+    n_img_pretrained = [1000, 5000]
+    combinations = it.product(models, n_img_orig, n_img_pretrained)
+    combinations = [(mod, orig, n_gen) for mod, orig, n_gen in combinations if n_gen >= orig]
+    logger.debug(f"starting a large grid with {combinations} combinations")
+    for mod, orig, n_gen in combinations:
+        logger.debug(f"setting for this run => n_orig:{orig}, n_train:{n_gen}")
+        main(dataset=dataset, generator=generator, model=mod, output_folder=output_folder, early_stopping=False,
+             n_orig_img=orig, n_train_img=n_gen, pretrained_folder=pretrained_folder, epochs=epochs, use_tqdm=use_tqdm)
+        logger.debug(f"done with run.")
 
 
 if __name__ == "__main__":
     fire.Fire({
         "single-experiment": main,
-        "grid-pretrain": make_pretraines
+        "run-grid": run_grid
     })

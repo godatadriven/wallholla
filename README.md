@@ -9,20 +9,71 @@
 Here's an example: 
 
 ```
-python command.py \
-  --dataset=catdog-small \
-  --data_size=10000 \
-  --generator=not-random \
-  --epochs=250 \
-  --learning_rate=0.001
+python command.py run-grid --dataset=catdog --model=vgg16
 ```
+
+#### FloydHub 
 
 If you want to run this on floydhub.
 
 ```
-floyd
+floyd run --cpu2 --env tensorflow-1.8 --data cantdutchthis/datasets/dataz/1:/datasets "python command.py run-grid --dataset=catdog --model=vgg16"
 ```
 
+You can retreive data from the job via; 
+
+```
+floyd data clone cantdutchthis/projects/walholla/47/output
+floyd data clone cantdutchthis/projects/walholla/48/output
+floyd data clone cantdutchthis/projects/walholla/49/output
+floyd data clone cantdutchthis/projects/walholla/51/output
+floyd data clone cantdutchthis/projects/walholla/52/output
+floyd data clone cantdutchthis/projects/walholla/54/output
+floyd data clone cantdutchthis/projects/walholla/55/output
+mv *.csv output
+```
+
+#### AWS Sagemaker 
+
+First make sure all the images are on S3. 
+
+```
+aws s3 sync /datasets s3://walholla-imgs
+```
+
+AWS expects to run the following command in sagemaker with one of your containers.
+
+```
+docker run <img> train
+```
+
+So we've got a stupidly simple container set up to run this.
+
+## Getting the container to AWS
+
+Type in the following:
+
+```
+aws ecr get-login --no-include-email --region eu-west-1
+```
+
+This gives you a giant blob of a URL. Copy it and run it. Now yer logged in. Next;
+
+```
+docker build -t walholla .
+docker tag <repo_link>
+docker push <repo_link>
+```
+
+For me this was;
+
+```
+docker build -t sgmkrs .
+docker tag walholla-repo:latest 829902169525.dkr.ecr.eu-west-1.amazonaws.com/walholla-repo:latest
+docker push 829902169525.dkr.ecr.eu-west-1.amazonaws.com/walholla-repo:latest
+```
+
+Now that this has been pushed, sagemaker can run it. The `sagemaker.py` script contains all you'll need.  
 
 ## File Structure
 

@@ -129,7 +129,7 @@ def copy_files_tmp(n_orig_img, train_folder):
     return tmp_folder
 
 
-def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, filenames, img_size):
+def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, filenames, img_size, use_tqdm=True):
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
     data_fp_x_valid = ensure_exists(os.path.join(pretrained_folder, x_valid_fname))
     data_fp_y_valid = ensure_exists(os.path.join(pretrained_folder, y_valid_fname))
@@ -153,9 +153,13 @@ def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, fi
     y_shape = (n_imgs ,)
     x_valid = np.ones(shape=x_shape)
     y_valid = np.ones(shape=y_shape)
+
     logger.debug(f"validation data to have shape {x_valid.shape}")
     logger.debug(f"validation labels to have shape {y_valid.shape}")
-    for i in tqdm.tqdm(range(len(glob.glob(valid_folder + '/*/*')))):
+    iterator = range(len(glob.glob(valid_folder + '/*/*')))
+    if use_tqdm:
+        iterator = tqdm.tqdm(range(len(glob.glob(valid_folder + '/*/*'))))
+    for i in iterator:
         img_data_valid, label_data_valid = next(valid_generator)
         x_valid[i, :] = img_data_valid.squeeze()
         y_valid[i] = label_data_valid.squeeze()
@@ -173,7 +177,8 @@ def make_validation_pretrained(dataset, class_mode, model, pretrained_folder, fi
     logger.debug(f"data has been written over at {data_fp_y_valid}")
 
 
-def make_training_pretrained(datagen, dataset, class_mode, model, pretrained_folder, filenames, n_orig_img, n_train_img, img_size):
+def make_training_pretrained(datagen, dataset, class_mode, model, pretrained_folder, filenames,
+                             n_orig_img, n_train_img, img_size, use_tqdm=False):
     x_train_fname, y_train_fname, x_valid_fname, y_valid_fname = filenames
     train_folder, valid_folder = get_folders(dataset=dataset)
     if not n_orig_img:
@@ -197,7 +202,10 @@ def make_training_pretrained(datagen, dataset, class_mode, model, pretrained_fol
     logger.debug(f"train data to have shape {x_train.shape}")
     logger.debug(f"train labels to have shape {y_train.shape}")
     logger.debug(f"about to generate pretrained dataset for training")
-    for i in tqdm.tqdm(range(n_train_img)):
+    iterator = range(n_train_img)
+    if use_tqdm:
+        iterator = tqdm.tqdm(range(n_train_img))
+    for i in iterator:
         img_data_train, label_data_train = next(train_generator)
         x_train[i, :] = img_data_train.squeeze()
         y_train[i] = label_data_train.squeeze()
@@ -245,23 +253,21 @@ def make_pretrained_weights(dataset="catdog", generator="random", class_mode="bi
                                filenames=filenames,
                                img_size=img_size)
 
-
-
-
     if n_orig_img:
         rmtree(TMP_FOLDER)
         logger.debug("cleaned up tmp folder after writing pretrained features")
 
 
 def get_pretrained_weights(dataset="catdog", generator="random", class_mode="binary",
-                           model="mobilenet", n_img=10, img_size=(224, 224),
+                           model="mobilenet", n_img=10, n_orig_img=10, img_size=(224, 224),
                            pretrained_folder=PRETRAINED_PATH):
-    filenames = make_pretrained_filenames(dataset, generator, model, n_img, img_size, npy=True)
+    filenames = make_pretrained_filenames(dataset, generator, model, n_img, img_size, n_orig_img, npy=True)
+    logger.debug("checking for pre-existing files")
     for name in filenames:
         if not os.path.exists(os.path.join(pretrained_folder, name)):
             logger.debug(f"{os.path.join(pretrained_folder, name)} does not exist! creating .npz files.")
             make_pretrained_weights(dataset=dataset, generator=generator, class_mode=class_mode,
-                                    model=model, n_train_img=n_img, img_size=img_size,
+                                    model=model, n_train_img=n_img, img_size=img_size, n_orig_img=n_orig_img,
                                     pretrained_folder=pretrained_folder)
 
     x_train_fpath, y_train_fpath, x_valid_fpath, y_valid_fpath = [os.path.join(pretrained_folder, _) for _ in filenames]
@@ -279,7 +285,7 @@ def get_pretrained_weights(dataset="catdog", generator="random", class_mode="bin
     return x_train, y_train, x_valid, y_valid
 
 
-def final_layers_model(input_shape, hidden_layer=10, dropout=0.5):
+def final_layers_model(input_shape, hidden_layer=10, dropout=0.0):
     logger.debug(f"creating model for image shape {input_shape}")
     img_input = Input(shape=input_shape[1:])
     x = Flatten()(img_input)
@@ -291,5 +297,4 @@ def final_layers_model(input_shape, hidden_layer=10, dropout=0.5):
 
 
 if __name__ == "__main__":
-    # TODO: check if validation set allready exists before creating!
     fire.Fire(make_pretrained_weights)

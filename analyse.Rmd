@@ -1,0 +1,37 @@
+---
+title: "Deep Learning"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+
+df <- list.files("output") %>% 
+  map(~ file.path(getwd(), 'output', .)) %>% 
+  map(read_csv) %>% 
+  map(function(d) d %>% mutate(runid = as.character(runid))) %>% 
+  reduce(bind_rows)
+
+df %>% View()
+```
+
+```{r}
+agg <- df %>% 
+  group_by(dataset, n_train_img, n_orig_img) %>% 
+  summarise(acc = last(acc), val_acc = last(val_acc))
+
+ggplot() + 
+  geom_point(data=agg, aes(n_orig_img, acc)) + 
+  facet_grid(n_train_img ~ .)
+```
+
+
+```{r}
+ggplot() + 
+  geom_line(data=df, aes(epoch, acc, group=runid), colour="steelblue") + 
+  facet_grid(dataset + n_train_img ~ n_orig_img) + 
+  ylim(0.7, NA)
+```
+
+
